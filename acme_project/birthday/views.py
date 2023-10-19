@@ -1,7 +1,9 @@
 from typing import Any
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import (
     CreateView, DeleteView, DetailView, ListView, UpdateView
 )
+from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from .forms import BirthdayForm
 from .utils import calculate_birthday_countdown
@@ -24,14 +26,27 @@ class BirthdayMixin:
 #     return render(request, 'birthday/birthday.html', context=context)
 
 
-class BirthdayCreateView(BirthdayMixin, CreateView):
+class BirthdayCreateView(BirthdayMixin, LoginRequiredMixin, CreateView):
     model = Birthday
     form_class = BirthdayForm
 
+    def form_valid(self, form):
+        # Присвоить полю author объект пользователя из запроса.
+        form.instance.author = self.request.user
+        # Продолжить валидацию, описанную в форме.
+        return super().form_valid(form)
 
-class BirthdayUpdateView(BirthdayMixin, UpdateView):
+
+class BirthdayUpdateView(BirthdayMixin, LoginRequiredMixin, UpdateView):
     model = Birthday
     form_class = BirthdayForm
+
+    def dispatch(self, request, *args, **kwargs):
+        # Получаем объект по первичному ключу и автору или вызываем 404 ошибку.
+        get_object_or_404(Birthday, pk=kwargs['pk'], author=request.user)
+        # Если объект был найден, то вызываем родительский метод, 
+        # чтобы работа CBV продолжилась.
+        return super().dispatch(request, *args, **kwargs)
 
 
 # def birthday(request, pk=None):
@@ -68,7 +83,7 @@ class BirthdayListView(ListView):
     # ...сортировку, которая будет применена при выводе списка объектов:
     ordering = 'id'
     # ...и даже настройки пагинации:
-    paginate_by = 2
+    paginate_by = 5
 
 
 # def birthday_list(request):
@@ -82,9 +97,16 @@ class BirthdayListView(ListView):
 #     return render(request, 'birthday/birthday_list.html', context)
 
 
-class BirthdayDeleteView(BirthdayMixin, DeleteView):
+class BirthdayDeleteView(BirthdayMixin, LoginRequiredMixin, DeleteView):
     model = Birthday
     success_url = reverse_lazy('birthday:list')
+    
+    def dispatch(self, request, *args, **kwargs):
+        # Получаем объект по первичному ключу и автору или вызываем 404 ошибку.
+        get_object_or_404(Birthday, pk=kwargs['pk'], author=request.user)
+        # Если объект был найден, то вызываем родительский метод, 
+        # чтобы работа CBV продолжилась.
+        return super().dispatch(request, *args, **kwargs)
 
 
 class BirthdayDetailView(DetailView):
